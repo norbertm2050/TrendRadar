@@ -55,26 +55,14 @@ schedule:
 platforms:
   enabled: true                         # 是否启用热榜平台抓取
   sources:
-    - id: "toutiao"
-      name: "今日头条"
     - id: "baidu"
       name: "百度热搜"
     - id: "wallstreetcn-hot"
       name: "华尔街见闻"
     - id: "thepaper"
       name: "澎湃新闻"
-    - id: "bilibili-hot-search"
-      name: "bilibili 热搜"
     - id: "cls-hot"
       name: "财联社热门"
-    - id: "ifeng"
-      name: "凤凰网"
-    - id: "tieba"
-      name: "贴吧"
-    - id: "weibo"
-      name: "微博"
-    - id: "douyin"
-      name: "抖音"
     - id: "zhihu"
       name: "知乎"
 
@@ -127,6 +115,54 @@ rss:
       name: "雅虎财经"
       url: "https://finance.yahoo.com/news/rssindex"
 
+    - id: "wsj-markets"
+      name: "WSJ Markets"
+      url: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+
+    - id: "sec-press"
+      name: "SEC Press Releases"
+      url: "https://www.sec.gov/news/pressreleases.rss"
+
+    - id: "fed-press"
+      name: "Federal Reserve"
+      url: "https://www.federalreserve.gov/feeds/press_all.xml"
+
+    - id: "cnbc-markets"
+      name: "CNBC Markets"
+      url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"
+
+    - id: "cnbc-world"
+      name: "CNBC World"
+      url: "https://www.cnbc.com/id/100727362/device/rss/rss.html"
+
+    - id: "techcrunch"
+      name: "TechCrunch"
+      url: "https://techcrunch.com/feed/"
+
+    - id: "the-register"
+      name: "The Register"
+      url: "https://www.theregister.com/headlines.atom"
+
+    - id: "google-market-signals"
+      name: "Google Market Signals"
+      url: "https://news.google.com/rss/search?q=global%20stocks%20OR%20Fed%20OR%20tariffs%20OR%20semiconductor%20OR%20AI%20markets&hl=en-US&gl=US&ceid=US:en"
+
+    - id: "google-regulatory-shocks"
+      name: "Google Regulatory Shocks"
+      url: "https://news.google.com/rss/search?q=%28SEC%20OR%20DOJ%20OR%20FTC%20OR%20antitrust%20OR%20subpoena%20OR%20investigation%29%20%28stock%20OR%20shares%20OR%20market%29&hl=en-US&gl=US&ceid=US:en"
+
+    - id: "google-short-activist"
+      name: "Google Short & Activist Signals"
+      url: "https://news.google.com/rss/search?q=%28short%20seller%20report%20OR%20activist%20investor%20OR%20insider%20selling%20OR%20unusual%20options%29%20stocks&hl=en-US&gl=US&ceid=US:en"
+
+    - id: "google-chip-supply"
+      name: "Google Chip Supply Signals"
+      url: "https://news.google.com/rss/search?q=%28semiconductor%20OR%20AI%20datacenter%20OR%20HBM%20OR%20ASML%20OR%20TSMC%20OR%20Nvidia%29%20%28export%20controls%20OR%20power%20OR%20shortage%20OR%20sanctions%20OR%20earnings%29&hl=en-US&gl=US&ceid=US:en"
+
+    - id: "google-geopolitics-markets"
+      name: "Google Geopolitics Markets"
+      url: "https://news.google.com/rss/search?q=%28tariffs%20OR%20sanctions%20OR%20Taiwan%20OR%20Ukraine%20OR%20Middle%20East%20OR%20election%29%20%28stocks%20OR%20oil%20OR%20bonds%20OR%20FX%20OR%20semiconductors%29&hl=en-US&gl=US&ceid=US:en"
+
     # 自定义源示例
     # - id: "custom-feed"
     #   name: "自定义源"
@@ -160,11 +196,11 @@ report:
   # 关键词模式分组排序方式（仅 keyword 模式生效）
   # true: 按 frequency_words.txt 的定义顺序排列
   # false: 按匹配到的热点条数排序（条数多的在前）
-  sort_by_position_first: false
+  sort_by_position_first: true
 
   rank_threshold: 5                   # 排名高亮阈值（影响展示强调，不改变抓取范围）
 
-  max_news_per_keyword: 0             # 每个关键词/标签最大显示数量（0=不限制，仅影响展示裁剪）
+  max_news_per_keyword: 8             # 每个关键词/标签最大显示数量（0=不限制，仅影响展示裁剪）
 
 
 # ===============================================================
@@ -178,7 +214,7 @@ report:
 # 5) 这里决定“筛选路径”，不决定 AI 模型（模型在 ai 段）
 # ===============================================================
 filter:
-  method: "ai"                     # 可选: keyword | ai
+  method: "keyword"                # 可选: keyword | ai
 
   # AI 模式标签排序开关（仅 ai 模式生效）
   # true: 按标签优先级排序（来自兴趣描述提取顺序）
@@ -207,7 +243,7 @@ ai_filter:
   batch_interval: 2                       # 分批处理时，每批之间的等待时间（秒）
                                           # 避免频繁调用 API 触发限流，设为 0 则不等待
 
-  min_score: 0.7                          # 推送最低分数阈值（0.0 ~ 1.0）
+  min_score: 0.60                         # 推送最低分数阈值（0.0 ~ 1.0）
                                           # 0 = 不过滤；值越高越严格（推荐先用 0.5~0.7）
 
   # 兴趣描述文件
@@ -251,24 +287,24 @@ display:
   #   1. 在此列表中
   #   2. 下方 regions 中对应开关为 true
   region_order:
+    - ai_analysis                         # 1️⃣ AI 分析区域
     - new_items                           # 1️⃣ 新增热点区域
     - hotlist                             # 2️⃣ 热榜区域（关键词匹配 / AI 智能筛选）
     - rss                                 # 3️⃣ RSS 订阅区域
     - standalone                          # 4️⃣ 独立展示区
-    - ai_analysis                         # 5️⃣ AI 分析区域
 
   # 推送区域开关
   # 控制各区域是否启用（配合 region_order 使用）
   regions:
     hotlist: true                     # 热榜区域（关键词匹配 / AI 智能筛选）
-    new_items: false                   # 新增热点区域（含热榜新增 + RSS 新增）
+    new_items: true                    # 新增热点区域（含热榜新增 + RSS 新增）
                                       # 注：热点词汇统计中的新增标记🆕不受此配置影响
 
     rss: true                         # RSS 订阅区域
                                       # 开启后将对 RSS 进行关键词分析并在通知中展示
                                       # 关闭后跳过分析，但独立展示区不受影响
 
-    standalone: false                 # 独立展示区（完整热榜/RSS，不受关键词过滤）
+    standalone: true                  # 独立展示区（完整热榜/RSS，不受关键词过滤）
     ai_analysis: true                 # AI 分析区域
 
   # 📋 独立展示区配置
@@ -278,9 +314,10 @@ display:
   #   - AI 分析：由 ai_analysis.include_standalone 开关控制，将完整数据送入 AI 做深度分析
   # 两者共享此处的平台/RSS 配置，但开关互相独立（可只开 AI 分析、不推送展示）
   standalone:
-    platforms: ["zhihu", "wallstreetcn-hot"]     # 热榜平台 ID 列表（如 ["zhihu", "weibo"]）
-    rss_feeds: []                     # RSS 源 ID 列表（如 ["hacker-news"]）
-    max_items: 20                     # 每个源最多展示条数（0=不限制）
+    platforms: ["wallstreetcn-hot", "cls-hot", "zhihu"]     # 热榜平台 ID 列表（如 ["zhihu", "weibo"]）
+    rss_feeds: ["wsj-markets", "sec-press", "fed-press", "cnbc-markets", "the-register", "google-market-signals", "google-regulatory-shocks", "google-short-activist", "google-chip-supply", "google-geopolitics-markets"]                     # RSS 源 ID 列表（如 ["hacker-news"]）
+    filter_by_keywords: true          # 独立展示区也只保留政治/财经/科技/市场相关标题
+    max_items: 6                      # 每个源最多展示条数（0=不限制）
 
 
 # ===============================================================
@@ -308,7 +345,7 @@ display:
 # • 跑通后再增加多渠道和多账号，排障成本最低
 # ===============================================================
 notification:
-  enabled: true                       # 是否启用通知功能（总开关）
+  enabled: false                      # 是否启用通知功能（总开关）
                                       # ⚠️ 开启调度系统后，此项仍为总开关：
                                       #   false → 永远不推送（无论调度怎么设置）
                                       #   true  → 由调度的 push 字段控制何时推送
@@ -507,7 +544,7 @@ ai_analysis:
                                       # GitHub Action 部署默认推送约 20 次（每小时推送一次）， 约 0.1 元/天
                                       # Docker 部署默认推送 48 次(每半小时推送一次)， 约 0.2 元/天
 
-  include_rss: false                # 是否包含 RSS 内容进行分析
+  include_rss: true                 # 是否包含 RSS 内容进行分析
   
   include_standalone: true          # 是否将独立展示区数据纳入 AI 分析
                                     # 数据源列表来自 display.standalone.platforms / display.standalone.rss_feeds
@@ -527,7 +564,7 @@ ai_analysis:
 # 模型配置见上方 ai 配置段
 # ===============================================================
 ai_translation:
-  enabled: true                    # 是否启用翻译功能
+  enabled: false                   # 是否启用翻译功能
 
   # 翻译目标语言
   # 格式：自然语言描述

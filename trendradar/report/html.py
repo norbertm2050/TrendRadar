@@ -5,12 +5,85 @@ HTML 报告渲染模块
 提供 HTML 格式的热点新闻报告生成功能
 """
 
+import copy
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Callable
 
 from trendradar.report.helpers import html_escape
+from trendradar.report.dedupe import TitleDeduper
 from trendradar.utils.time import convert_time_for_display
 from trendradar.ai.formatter import render_ai_analysis_html_rich
+
+
+def _dedupe_title_items(items: List[Dict], deduper: TitleDeduper) -> List[Dict]:
+    unique_items = []
+    for item in items or []:
+        unique = deduper.add(item)
+        if unique is not None:
+            unique_items.append(unique)
+    return unique_items
+
+
+def _dedupe_render_sections(
+    report_data: Dict,
+    rss_items: Optional[List[Dict]],
+    rss_new_items: Optional[List[Dict]],
+    standalone_data: Optional[Dict],
+) -> tuple:
+    """De-duplicate story titles across all visible HTML sections."""
+    report_data = copy.deepcopy(report_data) if report_data else {}
+    rss_items = copy.deepcopy(rss_items) if rss_items else None
+    rss_new_items = copy.deepcopy(rss_new_items) if rss_new_items else None
+    standalone_data = copy.deepcopy(standalone_data) if standalone_data else None
+
+    deduper = TitleDeduper()
+
+    new_sources = []
+    for source_data in report_data.get("new_titles", []) or []:
+        source_data["titles"] = _dedupe_title_items(source_data.get("titles", []), deduper)
+        if source_data["titles"]:
+            new_sources.append(source_data)
+    report_data["new_titles"] = new_sources
+    report_data["total_new_count"] = sum(len(source["titles"]) for source in new_sources)
+
+    stats = []
+    for stat in report_data.get("stats", []) or []:
+        stat["titles"] = _dedupe_title_items(stat.get("titles", []), deduper)
+        stat["count"] = len(stat["titles"])
+        if stat["titles"]:
+            stats.append(stat)
+    report_data["stats"] = stats
+
+    def dedupe_stats_groups(groups: Optional[List[Dict]]) -> Optional[List[Dict]]:
+        if not groups:
+            return groups
+        unique_groups = []
+        for stat in groups:
+            stat["titles"] = _dedupe_title_items(stat.get("titles", []), deduper)
+            stat["count"] = len(stat["titles"])
+            if stat["titles"]:
+                unique_groups.append(stat)
+        return unique_groups
+
+    rss_items = dedupe_stats_groups(rss_items)
+    rss_new_items = dedupe_stats_groups(rss_new_items)
+
+    if standalone_data:
+        for section_name in ("platforms", "rss_feeds"):
+            groups = []
+            for group in standalone_data.get(section_name, []) or []:
+                source_name = group.get("name", group.get("id", ""))
+                prepared_items = []
+                for item in group.get("items", []) or []:
+                    item = dict(item)
+                    item.setdefault("source_name", source_name)
+                    prepared_items.append(item)
+                group["items"] = _dedupe_title_items(prepared_items, deduper)
+                if group["items"]:
+                    groups.append(group)
+            standalone_data[section_name] = groups
+
+    return report_data, rss_items, rss_new_items, standalone_data
 
 
 def render_html_content(
@@ -51,6 +124,10 @@ def render_html_content(
     default_region_order = ["hotlist", "rss", "new_items", "standalone", "ai_analysis"]
     if region_order is None:
         region_order = default_region_order
+
+    report_data, rss_items, rss_new_items, standalone_data = _dedupe_render_sections(
+        report_data, rss_items, rss_new_items, standalone_data
+    )
 
     html = """
     <!DOCTYPE html>
@@ -1735,6 +1812,8 @@ def render_html_content(
                 first_time = item.get("first_time", "")
                 last_time = item.get("last_time", "")
                 count = item.get("count", 1)
+                merged_source = item.get("source_name", "")
+                duplicate_count = int(item.get("duplicate_count", 1) or 1)
 
                 standalone_html += f"""
                         <div class="news-item">
@@ -1783,6 +1862,11 @@ def render_html_content(
                 if count > 1:
                     standalone_html += f'<span class="count-info">{count}次</span>'
 
+                if merged_source and (merged_source != platform_name or duplicate_count > 1):
+                    standalone_html += f'<span class="source-name">{html_escape(merged_source)}</span>'
+                if duplicate_count > 1:
+                    standalone_html += f'<span class="count-info">合并{duplicate_count}源</span>'
+
                 standalone_html += """
                                 </div>
                                 <div class="news-title">"""
@@ -1823,6 +1907,8 @@ def render_html_content(
                 url = item.get("url", "")
                 published_at = item.get("published_at", "")
                 author = item.get("author", "")
+                merged_source = item.get("source_name", "")
+                duplicate_count = int(item.get("duplicate_count", 1) or 1)
 
                 standalone_html += f"""
                         <div class="news-item">
@@ -1847,6 +1933,10 @@ def render_html_content(
                 # 作者显示
                 if author:
                     standalone_html += f'<span class="source-name">{html_escape(author)}</span>'
+                if merged_source and (merged_source != feed_name or duplicate_count > 1):
+                    standalone_html += f'<span class="source-name">{html_escape(merged_source)}</span>'
+                if duplicate_count > 1:
+                    standalone_html += f'<span class="count-info">合并{duplicate_count}源</span>'
 
                 standalone_html += """
                                 </div>

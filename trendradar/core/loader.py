@@ -253,6 +253,7 @@ def _load_display_config(config_data: Dict) -> Dict:
         "STANDALONE": {
             "PLATFORMS": standalone.get("platforms", []),
             "RSS_FEEDS": standalone.get("rss_feeds", []),
+            "FILTER_BY_KEYWORDS": standalone.get("filter_by_keywords", False),
             "MAX_ITEMS": standalone.get("max_items", 20),
         },
     }

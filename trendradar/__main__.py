@@ -28,6 +28,7 @@ from trendradar.storage import convert_crawl_results_to_news_data
 from trendradar.utils.time import DEFAULT_TIMEZONE, is_within_days, calculate_days_old
 from trendradar.ai import AIAnalyzer, AIAnalysisResult
 from trendradar.core.scheduler import ResolvedSchedule
+from trendradar.report.dedupe import TitleDeduper
 
 
 def _parse_version(version_str: str) -> Tuple[int, int, int]:
@@ -674,6 +675,7 @@ class NewsAnalyzer:
         platform_ids = standalone_config.get("PLATFORMS", [])
         rss_feed_ids = standalone_config.get("RSS_FEEDS", [])
         max_items = standalone_config.get("MAX_ITEMS", 20)
+        filter_by_keywords = standalone_config.get("FILTER_BY_KEYWORDS", False)
 
         if not platform_ids and not rss_feed_ids:
             return None
@@ -682,6 +684,15 @@ class NewsAnalyzer:
             "platforms": [],
             "rss_feeds": [],
         }
+        standalone_deduper = TitleDeduper()
+
+        word_groups = filter_words = global_filters = None
+        if filter_by_keywords:
+            try:
+                word_groups, filter_words, global_filters = self.ctx.load_frequency_words(self.frequency_file)
+            except Exception as e:
+                print(f"[独立展示区] 关键词过滤加载失败，回退为不过滤: {e}")
+                filter_by_keywords = False
 
         # 找出最新批次时间（类似 current 模式的过滤逻辑）
         latest_time = None
@@ -703,6 +714,11 @@ class NewsAnalyzer:
 
             items = []
             for title, title_data in platform_titles.items():
+                if filter_by_keywords and not self.ctx.matches_word_groups(
+                    title, word_groups, filter_words, global_filters
+                ):
+                    continue
+
                 # 获取元信息（如果有 title_info）
                 meta = {}
                 if title_info and platform_id in title_info and title in title_info[platform_id]:
@@ -737,8 +753,11 @@ class NewsAnalyzer:
                     "last_time": meta.get("last_time", ""),
                     "count": meta.get("count", 1),
                     "rank_timeline": meta.get("rank_timeline", []),
+                    "source_name": platform_name,
                 }
-                items.append(item)
+                unique_item = standalone_deduper.add(item)
+                if unique_item is not None:
+                    items.append(unique_item)
 
             # 按当前排名排序
             items.sort(key=lambda x: x["rank"] if x["rank"] > 0 else 9999)
@@ -761,23 +780,35 @@ class NewsAnalyzer:
             for item in rss_items:
                 feed_id = item.get("feed_id", "")
                 if feed_id in rss_feed_ids:
+                    title = item.get("title", "")
+                    if filter_by_keywords and not self.ctx.matches_word_groups(
+                        title, word_groups, filter_words, global_filters
+                    ):
+                        continue
+
                     if feed_id not in feed_items_map:
                         feed_items_map[feed_id] = {
                             "name": item.get("feed_name", feed_id),
                             "items": [],
                         }
                     feed_items_map[feed_id]["items"].append({
-                        "title": item.get("title", ""),
+                        "title": title,
                         "url": item.get("url", ""),
                         "published_at": item.get("published_at", ""),
                         "author": item.get("author", ""),
+                        "feed_name": item.get("feed_name", feed_id),
+                        "source_name": item.get("feed_name", feed_id),
                     })
 
             # 限制条数并添加到结果
             for feed_id in rss_feed_ids:
                 if feed_id in feed_items_map:
                     feed_data = feed_items_map[feed_id]
-                    items = feed_data["items"]
+                    items = []
+                    for item in feed_data["items"]:
+                        unique_item = standalone_deduper.add(item)
+                        if unique_item is not None:
+                            items.append(unique_item)
                     if max_items > 0:
                         items = items[:max_items]
                     if items:

@@ -10,6 +10,8 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 
+from trendradar.report.dedupe import TitleDeduper
+
 
 def prepare_report_data(
     stats: List[Dict],
@@ -40,6 +42,7 @@ def prepare_report_data(
         Dict: 准备好的报告数据
     """
     processed_new_titles = []
+    title_deduper = TitleDeduper()
 
     # 在增量模式下或配置关闭时隐藏新增新闻区域
     hide_new_section = mode == "incremental" or not show_new_section
@@ -89,7 +92,9 @@ def prepare_report_data(
                         "mobile_url": mobile_url,
                         "is_new": True,
                     }
-                    source_titles.append(processed_title)
+                    unique_title = title_deduper.add(processed_title)
+                    if unique_title is not None:
+                        source_titles.append(unique_title)
 
                 if source_titles:
                     processed_new_titles.append(
@@ -118,12 +123,17 @@ def prepare_report_data(
                 "mobile_url": title_data.get("mobileUrl", ""),
                 "is_new": title_data.get("is_new", False),
             }
-            processed_titles.append(processed_title)
+            unique_title = title_deduper.add(processed_title)
+            if unique_title is not None:
+                processed_titles.append(unique_title)
+
+        if not processed_titles:
+            continue
 
         processed_stats.append(
             {
                 "word": stat["word"],
-                "count": stat["count"],
+                "count": len(processed_titles),
                 "percentage": stat.get("percentage", 0),
                 "titles": processed_titles,
             }
